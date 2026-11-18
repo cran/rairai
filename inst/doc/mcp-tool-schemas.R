@@ -1,0 +1,225 @@
+## -----------------------------------------------------------------------------
+#| label: setup
+#| include: false
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+
+find_package_root <- function(path = getwd()) {
+  path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+
+  repeat {
+    if (
+      file.exists(file.path(path, "DESCRIPTION")) &&
+        dir.exists(file.path(path, "R"))
+    ) {
+      return(path)
+    }
+
+    parent <- dirname(path)
+    if (identical(parent, path)) {
+      stop("Could not find package root from ", getwd(), call. = FALSE)
+    }
+    path <- parent
+  }
+}
+
+root <- find_package_root()
+knitr::opts_knit$set(root.dir = root)
+
+pkgload::load_all(root, quiet = TRUE)
+
+format_json <- function(x) {
+  if (is.character(x) && length(x) == 1L && jsonlite::validate(x)) {
+    x <- jsonlite::fromJSON(x, simplifyVector = FALSE)
+  }
+
+  jsonlite::toJSON(
+    x,
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    null = "null",
+    na = "null"
+  ) |>
+    stringr::str_replace_all(stringr::fixed(root), "/path/to/rairai")
+}
+
+serve_tools <- getFromNamespace("serve_tools", "rairai")
+PackageToolService <- getFromNamespace("PackageToolService", "rairai")
+
+service <- PackageToolService$new(root_path = root)
+tools <- serve_tools(service)
+dispatch <- getFromNamespace("dispatch_message", "mcplite")
+initialization <- dispatch(
+  list(
+    jsonrpc = "2.0",
+    id = 1,
+    method = "initialize",
+    params = list(
+      protocolVersion = "2025-11-25",
+      capabilities = structure(list(), names = character()),
+      clientInfo = list(name = "rairai-vignette", version = "0.0.0")
+    )
+  ),
+  getFromNamespace("new_server_state", "mcplite")(tools)
+)
+stopifnot(identical(
+  initialization$response$result$protocolVersion,
+  "2025-11-25"
+))
+state <- dispatch(
+  list(jsonrpc = "2.0", method = "notifications/initialized"),
+  initialization$state
+)$state
+response <- dispatch(
+  list(jsonrpc = "2.0", id = 2, method = "tools/list"),
+  state
+)
+tool_definitions <- response$response$result$tools
+tool_names <- vapply(tool_definitions, function(tool) tool$name, character(1))
+names(tools) <- tool_names
+names(tool_definitions) <- tool_names
+cran_tools <- c("cran_search", "cran_package")
+
+example_args <- list(
+  package_overview = stats::setNames(list(), character()),
+  package_dependencies = list(depth = 1L),
+  package_files = list(scope = "R", include = c("lines", "size")),
+  package_namespace = stats::setNames(list(), character()),
+  tests_for = list(name = "serve_tools"),
+  package_docs = list(package = "rairai", limit = 10L),
+  help_search = list(query = "serve", package = "rairai", limit = 5L),
+  help_page = list(
+    topic = "serve",
+    package = "rairai",
+    sections = c("Description", "Usage", "Arguments", "Examples"),
+    max_chars = 2000L
+  ),
+  package_vignettes = list(package = "rairai"),
+  package_news = list(package = "rairai"),
+  cran_search = list(query = "static analysis", n_results = 5L),
+  cran_package = list(package_name = "treesitter"),
+  r6_classes = stats::setNames(list(), character()),
+  r6_class = list(name = "PackageToolService"),
+  r6_method = list(class = "PackageToolService", method = "symbols"),
+  r6_method_references = list(
+    class = "PackageToolService",
+    method = "symbols"
+  ),
+  symbols = list(query = "serve", kind = "Function", limit = 20L),
+  definition = list(name = "serve", kind = "Function", exact = TRUE),
+  references = list(
+    name = "serve",
+    kind = "Function",
+    exact = TRUE,
+    limit = 20L
+  ),
+  function_formals = list(name = "serve"),
+  refactor_context = list(
+    name = "serve",
+    kind = "Function",
+    exact = TRUE,
+    limit = 20L
+  )
+)
+
+stopifnot(
+  length(tools) == 21L,
+  setequal(names(example_args), tool_names)
+)
+
+emit_tool_section <- function(name) {
+  tool <- tools[[name]]
+  schema <- tool_definitions[[name]]
+  args <- example_args[[name]]
+
+  if (is.null(args)) {
+    stop("No example arguments configured for tool `", name, "`.", call. = FALSE)
+  }
+
+  cat("## `", name, "`\n\n", sep = "")
+  cat(schema$description, "\n\n", sep = "")
+
+  cat("### Schema visible to the MCP client\n\n")
+  cat("```json\n")
+  cat(format_json(schema), "\n", sep = "")
+  cat("```\n\n")
+
+  cat("### Example input\n\n")
+  cat("```json\n")
+  cat(format_json(args), "\n", sep = "")
+  cat("```\n\n")
+
+  if (name %in% cran_tools) {
+    cat("Network example not run during rendering; no response is shown.\n\n")
+  } else {
+    result <- do.call(tool, args)
+    cat("### Example response\n\n")
+    cat("```json\n")
+    cat(format_json(result), "\n", sep = "")
+    cat("```\n\n")
+  }
+}
+
+emit_tool_group <- function(title, names) {
+  cat("# ", title, "\n\n", sep = "")
+  stopifnot(all(names %in% tool_names))
+
+  for (name in names) {
+    emit_tool_section(name)
+  }
+}
+
+
+## -----------------------------------------------------------------------------
+#| label: static-package-tools
+#| results: asis
+emit_tool_group(
+  "Static package tools",
+  c(
+    "package_overview",
+    "package_dependencies",
+    "package_files",
+    "package_namespace",
+    "tests_for",
+    "package_docs",
+    "help_search",
+    "help_page",
+    "package_vignettes",
+    "package_news"
+  )
+)
+
+
+## -----------------------------------------------------------------------------
+#| label: r6-tools
+#| results: asis
+emit_tool_group(
+  "R6 structure tools",
+  c(
+    "r6_classes",
+    "r6_class",
+    "r6_method",
+    "r6_method_references"
+  )
+)
+
+
+## -----------------------------------------------------------------------------
+#| label: source-workflow-tools
+#| results: asis
+emit_tool_group(
+  "Source and workflow tools",
+  c(
+    "symbols",
+    "definition",
+    "references",
+    "function_formals",
+    "refactor_context"
+  )
+)
+
+
+## -----------------------------------------------------------------------------
+#| label: cran-tools
+#| results: asis
+emit_tool_group("CRAN metadata tools", cran_tools)
+

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Design Principles</title>
+<style>
+
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+width: 0.8em;
+margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+</style>
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">Design Principles</h1>
+
+</header>
+
+
+<p><code>rairai</code> provides MCP tools that help AI agents understand and develop R packages. It does not try to replace an editor, shell, test runner, or file reader. Instead, it exposes compact R-package intelligence that is hard for a general agent to reconstruct reliably from raw files alone.</p>
+<p>The package is designed for agents that need to make code changes without guessing. Tools should help an agent discover package structure, navigate code, inspect definitions and references, and check feedback from R-specific systems before acting.</p>
+<h2 id="assumed-agent-environment">Assumed agent environment</h2>
+<p><code>rairai</code> assumes the caller is an AI coding agent working in an IDE, terminal, cloud workspace, or similar development environment. Such agents usually already have tools to:</p>
+<ul>
+<li>read files and selected line ranges;</li>
+<li>search file contents;</li>
+<li>edit files;</li>
+<li>run shell commands;</li>
+<li>run R package checks and tests;</li>
+<li>inspect editor diagnostics when available.</li>
+</ul>
+<p><code>rairai</code> tools should complement these capabilities rather than duplicate them. For example, a tool may return compact 1-based location strings and rely on the agent’s normal file-reading tool to fetch the source text.</p>
+<h2 id="implementation-boundaries">Implementation boundaries</h2>
+<p><code>R/serve.R</code> selects the effective canonical root before package-local tool work. The default root is immutable; a non-default <code>package_root</code> applies only to its call. <code>PackageToolService</code> shapes source and refactor responses for its bound root, and <code>SourceIndex</code> owns package-local syntax facts. Internal constructors consume canonical roots rather than selecting roots or changing cwd.</p>
+<p>MCP tools are public ingress even though <code>serve()</code> is the only R namespace export. Client-facing schemas describe inputs; they do not establish complete runtime rejection of malformed calls. Invocation boundaries own domain checks, while internal consumers rely on their established preconditions.</p>
+<p>The <a href="tools.html#tool-surface-and-package-roots">toolset overview</a> describes selectors, provenance, the CRAN exclusion, and filesystem-read limitations. Source indexing is static and covers flat <code>R/*.[Rr]</code> files; test-search scope is tool-specific. Installed-documentation lookup does not authorize executing inspected source or recovering external function signatures through runtime introspection.</p>
+<h2 id="source-location-policy">Source location policy</h2>
+<p>Many tools return a <code>location</code> field. A location is a compact 1-based source string such as <code>R/foo.R:12</code>, <code>R/foo.R:12-30</code>, or <code>R/foo.R:12:3-30:8</code>. Locations are optimized for AI-agent source reading and rewrite workflows, not only for editor cursor precision.</p>
+<p>For source objects such as functions, classes, and R6 members, <code>location</code> should represent the exact object range. Prefer a full line range over a start line whenever the tool can determine the range. When an object has immediately preceding ordinary or roxygen comments, tools that expose source-object records should report those comments in a sibling <code>leading_comment_lines</code> field such as <code>&quot;4&quot;</code> or <code>&quot;1-4&quot;</code>. That field is pathless because the file is already identified by <code>location</code>.</p>
+<p>Leading-comment detection scans upward from the exact start line and includes only the contiguous comment block immediately above the object. It stops at a blank line, real code, or the start of the file. Tools omit <code>leading_comment_lines</code> when no such block exists.</p>
+<p>Concrete references, text hits, call-site matches, and NEWS sections describe occurrences or document sections rather than source-object definitions. Their locations point to the matched range or requested context, without leading-comment context.</p>
+<h2 id="design-principles">Design principles</h2>
+<p>Use these principles as stable references when evaluating tool additions or changes. The toolset overview maps current tools to target workflows and these principles.</p>
+<h3 id="p1-design-for-llm-workflows-not-ide-cursors">P1 — Design for LLM workflows, not IDE cursors</h3>
+<p>IDE-oriented tools often start from a cursor position. AI agents more often reason in terms of names, files, tasks, and intent. Prefer interfaces that accept package concepts such as symbol names, file paths, scopes, and options over interfaces that require a line and column.</p>
+<p>Position-based operations are still useful as precise implementation primitives, especially when a previous tool has already returned a location. They should not be the only way to perform common tasks, and they should remain internal unless a concrete agent workflow requires exposing them publicly.</p>
+<h3 id="p2-reduce-guessing">P2 — Reduce guessing</h3>
+<p>Tools should make uncertainty explicit. If a symbol name is ambiguous, return a structured list of candidates instead of choosing one silently. If nothing is found, return a stable empty result. If source analysis or package metadata cannot answer, return a structured error or explicit limitation.</p>
+<p>The goal is not to make the agent feel confident. The goal is to give it enough specific evidence to proceed without inventing facts.</p>
+<h3 id="p3-prefer-compact-structured-outputs">P3 — Prefer compact, structured outputs</h3>
+<p>Tool responses should be concise and machine-readable. Prefer stable keys, root-relative source locations, counts, status fields, and 1-based line/column positions. The top-level <code>package_root</code> is canonical absolute provenance. Avoid long prose in tool outputs unless the underlying R system is itself returning documentation or messages.</p>
+<h3 id="p4-build-composable-primitives-and-useful-workflows">P4 — Build composable primitives and useful workflows</h3>
+<p>Some tools should expose precise primitives, such as file outlines, definitions, and references. Other tools may combine common multi-step workflows when that saves the agent from repeatedly performing the same sequence.</p>
+<p>A combined tool should be added when it reflects a common agent task and can reduce tool calls without hiding important ambiguity. It should not merely wrap a single primitive with a different name.</p>
+<h3 id="p5-avoid-overlap-with-general-coding-tools">P5 — Avoid overlap with general coding tools</h3>
+<p>Do not add tools whose main purpose is to read arbitrary files, search plain text, edit files, run commands, or summarize source code generically. Agents usually already have those capabilities. <code>rairai</code> should focus on R-package and R-language intelligence.</p>
+<p>This includes package validation commands such as <code>devtools::test()</code> and <code>devtools::check()</code>. These commands are important parts of an agent’s workflow, but they should normally be run through the agent’s shell or test-runner tools, not through <code>rairai</code>. They execute package code, can be long-running, and require process-management behavior that is outside the static package-intelligence boundary. <code>rairai</code> may help an agent decide what to test, find relevant tests, connect failures back to package context, but it should not duplicate the command runner itself.</p>
+<h3 id="p6-keep-r-package-semantics-central">P6 — Keep R package semantics central</h3>
+<p>Tools should understand R package structure and conventions where possible: <code>DESCRIPTION</code>, <code>NAMESPACE</code>, <code>R/</code>, tests, documentation, exported objects, S3 methods, R6 classes, and Tree-sitter-indexed source symbols. Prefer package-aware answers over raw filesystem or text-processing answers.</p>
+<p>Prefer static source-index and package metadata over approaches that require loading, installing, or evaluating the target package. Agents often work against a live, partially edited codebase where package code may not parse, load, install, or safely execute. Tools that inspect signatures, documentation, symbols, or package metadata should work from source and Rd/help metadata rather than depending on <code>load_all()</code>, namespace loading, or runtime introspection such as <code>formals()</code> on evaluated functions.</p>
+<h3 id="p7-make-safe-change-workflows-easier">P7 — Make safe change workflows easier</h3>
+<p>The most valuable tools are those that help an agent prepare for and verify a change: find the relevant code, understand definitions and references, inspect package metadata, and find related tests. Mutating or refactoring tools should be introduced cautiously and should prefer previewable, explicit behavior.</p>
+<h3 id="p8-keep-the-mcp-surface-reviewable">P8 — Keep the MCP surface reviewable</h3>
+<p>Tool names, descriptions, and argument schemas are part of the user interface for LLMs. They should be easy to review together and should guide the agent toward the preferred tool for a task. The public MCP surface should be a single concise LLM-facing toolset rather than a collection of profiles split by backend detail. When several tools overlap, descriptions should explain when to use the high-level workflow tool and when to use the lower-level primitive.</p>
+<h3 id="p9-make-optional-arguments-safe-against-client-defaulting">P9 — Make optional arguments safe against client defaulting</h3>
+<p>MCP clients may not preserve the distinction between an omitted optional argument, <code>null</code>, an empty string, and a concrete value. Some clients may also pre-fill optional arguments with schema defaults or choose the first enum value even when the intended behavior is to leave the parameter unspecified.</p>
+<p>Design tool arguments so accidental defaulting is safe. Optional filters should have an explicit no-filter sentinel such as <code>NULL</code>, <code>&quot;&quot;</code>, or <code>&quot;all&quot;</code> that cannot be confused with a real filter value. Avoid schemas where the first enum value is a meaningful restrictive filter, such as <code>0</code> when <code>0</code> means “filter to zero”. When possible, normalize omitted, <code>NULL</code>, empty string, and documented no-filter values to the same behavior. Tool descriptions should state how to request no filter, and tests should cover client-like calls that pass optional arguments as <code>NULL</code>, empty strings, or default-looking values.</p>
+<h2 id="questions-for-new-tools">Questions for new tools</h2>
+<p>Before adding a tool, ask:</p>
+<ol type="1">
+<li>What common agent task does this support?</li>
+<li>Does it provide R-package or R-language intelligence the agent cannot easily get from ordinary file/search/shell tools?</li>
+<li>Can it work from source and package metadata without requiring the target package to load, install, or execute?</li>
+<li>Can the interface use names, paths, scopes, or package concepts instead of requiring cursor positions?</li>
+<li>Are optional arguments safe if an MCP client sends <code>NULL</code>, an empty string, a schema default, or the first enum value instead of omitting the argument?</li>
+<li>How does it report ambiguity, empty results, and errors?</li>
+<li>Is it a primitive, a workflow tool, or unnecessary overlap?</li>
+<li>What evidence would an agent use from this response before editing code?</li>
+</ol>
+
+
+
+
+
+</body></html>
