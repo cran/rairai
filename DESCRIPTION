@@ -1,6 +1,6 @@
 Package: rairai
 Title: Model Context Protocol Server for Package Intelligence
-Version: 0.2.7
+Version: 0.2.8
 Authors@R: 
     person("Juha", "Itkonen", , "juha@tosidata.com", role = c("aut", "cre"))
 Description: Helps artificial intelligence (AI) agents develop 'R' packages
@@ -23,8 +23,8 @@ VignetteBuilder: quarto
 Config/roxygen2/version: 8.1.0
 Config/roxygen2/markdown: TRUE
 NeedsCompilation: no
-Packaged: 2026-10-30 13:30:58 UTC; juha
+Packaged: 2026-11-24 16:07:23 UTC; juha
 Author: Juha Itkonen [aut, cre]
 Maintainer: Juha Itkonen <juha@tosidata.com>
 Repository: CRAN
-Date/Publication: 2026-11-18 20:50:02 UTC
+Date/Publication: 2026-11-25 08:20:02 UTC
